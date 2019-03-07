@@ -1,0 +1,1 @@
+background.strain	copies.GAL3.genome	copies.GAL80.genome	copies.GAL4.genome	total.WT.copies.genomeAN606	1	0	1	2AN607	0	1	1	2AN608	1	1	0	2AN609	1	0	0	1AN610	0	1	0	1AN611	0	0	1	1AN612	0	0	0	0AN566	1	1	1	3KV447	1	1	1	3

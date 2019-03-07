@@ -1,0 +1,77 @@
+# Scripts for dealing with flow cytometry data.#
+source.code.path.file<-'/Users/anew/Downloads/HarmoniousCombinations-master/CustomFunctions.R'#
+aesthetics.dir<-'/Users/anew/Downloads/HarmoniousCombinations-master/Aesthetics_Harmonious_Combinations.R'#
+head.dir<-"/Users/anew/Downloads/HarmoniousCombinations-master/Experiment1"#
+plates.dir<-paste(head.dir,'/ExperimentalPlates',sep='')#
+figout<-'./figure.output/publication/'#
+outputdata<-'./output.data/'#
+layoutdir<-'./layout.sample.data/'#
+date<-'170927' # beginning date clones were measured#
+setwd(head.dir)#
+source(source.code.path.file)#
+source(aesthetics.dir)#
+br<-seq(-0.5,2.7,length=61)
+sessionInfo()
+# Scripts for dealing with flow cytometry data.#
+source.code.path.file<-'/Users/anew/Downloads/HarmoniousCombinations-master/CustomFunctions.R'#
+aesthetics.dir<-'/Users/anew/Downloads/HarmoniousCombinations-master/Aesthetics_Harmonious_Combinations.R'#
+head.dir<-"/Users/anew/Downloads/HarmoniousCombinations-master/Experiment1"#
+plates.dir<-paste(head.dir,'/ExperimentalPlates',sep='')#
+figout<-'./figure.output/publication/'#
+outputdata<-'./output.data/'#
+layoutdir<-'./layout.sample.data/'#
+date<-'170927' # beginning date clones were measured#
+setwd(head.dir)#
+source(source.code.path.file)#
+source(aesthetics.dir)#
+br<-seq(-0.5,2.7,length=61)#
+sessionInfo()#
+# this file generates these objects which can be used in downstream analysis#
+# merged.final<-fread(paste(date,"-DatasetWithGenerationsAndGeneExpression.txt",sep=''),sep='\t',header=T)#
+#
+####################################################
+### custom functions#
+####################################################
+#
+reverse_lev<-function(x,cust_order=NULL){#
+	if(!is.factor(x)){stop('\nx not a factor')}#
+	if(is.null(cust_order))cust_order<-length(levels(x)):1#
+	if(!is.null(cust_order))if(length(unique(cust_order))!=length(levels(x)))stop('\nyou screwed up the custom order')#
+	return(factor(x,levels=levels(x)[cust_order]))#
+}
+# Scripts for dealing with flow cytometry data.#
+source.code.path.file<-'/Users/anew/Downloads/HarmoniousCombinations-master/CustomFunctions.R'#
+aesthetics.dir<-'/Users/anew/Downloads/HarmoniousCombinations-master/Aesthetics_Harmonious_Combinations.R'#
+head.dir<-"/Users/anew/Downloads/HarmoniousCombinations-master/Experiment1"#
+plates.dir<-paste(head.dir,'/ExperimentalPlates',sep='')#
+figout<-'./figure.output/publication/'#
+outputdata<-'./output.data/'#
+layoutdir<-'./layout.sample.data/'#
+date<-'170927' # beginning date clones were measured#
+setwd(head.dir)#
+source(source.code.path.file)#
+source(aesthetics.dir)#
+br<-seq(-0.5,2.7,length=61)#
+sessionInfo()#
+# this file generates these objects which can be used in downstream analysis#
+# merged.final<-fread(paste(date,"-DatasetWithGenerationsAndGeneExpression.txt",sep=''),sep='\t',header=T)#
+#
+####################################################
+### custom functions#
+####################################################
+#
+reverse_lev<-function(x,cust_order=NULL){#
+	if(!is.factor(x)){stop('\nx not a factor')}#
+	if(is.null(cust_order))cust_order<-length(levels(x)):1#
+	if(!is.null(cust_order))if(length(unique(cust_order))!=length(levels(x)))stop('\nyou screwed up the custom order')#
+	return(factor(x,levels=levels(x)[cust_order]))#
+}#
+####################################################
+### load data#
+####################################################
+DT00<-fread(paste0('17092x-Dataset.txt'),sep='\t',header=T)
+DT00<-fread(paste0(outputdata,'17092x-Dataset.txt'),sep='\t',header=T)
+DT00
+DT0<-DT00[genotype.strain!='KV447'&source.plate%in%c("Plate_073",'Plate_074')]
+write.table(DT0, paste0(outputdata,'17092x-Dataset.txt'),header=T,sep='\t')
+write.table(DT0, paste0(outputdata,'17092x-Dataset.txt'),row.names=F,sep='\t')

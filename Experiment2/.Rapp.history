@@ -1,0 +1,301 @@
+# this code was used to generate figures related to experiment 2 for the manuscript#
+source.code.path.file<-'/Users/anew/Downloads/HarmoniousCombinations-master/CustomFunctions.R'#
+aesthetics.dir<-'/Users/anew/Downloads/HarmoniousCombinations-master/Aesthetics_Harmonious_Combinations.R'#
+head.dir<-"/Users/anew/Downloads/HarmoniousCombinations-master/Experiment2"#
+layout.dir<-'./layout.sample.data'#
+date<-'1707xx' # beginning date clones were measured#
+plates.dir<-paste(head.dir,'/ExperimentalPlates',sep='')#
+figout<-'./figure.output/publication/'#
+outputdata<-'./output.data/'#
+setwd(head.dir)#
+source(source.code.path.file)#
+source(aesthetics.dir)#
+writeplot<-F#
+rm(letters)#
+br<-seq(-0.5,2.7,length=61)#
+#
+####################################################
+### analysis: illustrative plots of initial filtering done on smaples based on size and shape characteristics determined by FCS and SSC channels.#
+####################################################
+# The majority of this code is for analyzing already-processed FCS data. see code in "preprocessing" scripts for that. #
+# For publication, I made an illustrative example of how a typical FCS file was analyzed#
+#
+setwd(plates.dir)#
+#
+dirs<-list.dirs()[grep('Plate',list.dirs())][1]#
+ix<-1 # this is normally a for loop which dumps a bunch of filtered flowCore data files in .rData format#
+wash=NULL # use if a blank sample was taken before every measurement#
+filtsize<-4 # filter size set for the curv2Filter#
+setwd(plates.dir) # directory where the plates are#
+setwd(dirs[ix]) # move to the directory where the plates are#
+dir<-paste(dirs[ix]) # make a list of all the directories with plates#
+setwd(plates.dir);setwd(dir) # move to the first directory in the list#
+fcs.files<-list.files(pattern='../*.fcs') # get all teh fcs files in the folder#
+# fsapply is normally used to go through each sample#
+flowframes<-read.flowSet(fcs.files, name.keyword="TUBE NAME", phenoData=list(name="TUBE NAME", Filename="$FIL")) # make a flowframe object of the fcs files#
+#	head(pData(phenoData(flowframes)))#
+fcs<-flowframes[[1]] # within fsapply, go through each item in the flow frame#
+if(!is.null(wash)){strt<-0} # establish a starting cell population #
+if(is.null(wash)){strt<-500} # set a variable of number of cells to discard if the previous reading was not washed#
+len<-length(exprs(fcs$'FSC-A')) # determine the length of the list acquired#
+if(len<(strt+1000)){filteredPlus<-NULL # if you have fewer than 1000 cells plus the amount you are discarding then count the sample as a NULL#
+	}else{#
+	ssc<-quantile(exprs(fcs[strt:len,3]),c(0.1,0.9)) # determine the quantiles to filter the ssc#
+	fsc<-quantile(exprs(fcs[strt:len,1]),c(0.1,0.9)) # determine the quantiles to filter the fsc#
+	rectGate <- rectangleGate("FSC-H"=fsc,"SSC-H"=ssc) # create a gate for the samples based on these quantiles#
+	filteredRec<-split(fcs,flowCore::filter(fcs,rectGate))$`defaultRectangleGate+` # actually filter the samples based on the rectangular gate#
+	c2f <- curv2Filter("FSC-H","SSC-H",bwFac=filtsize) # take rectangle filtered samples and apply the curve2Filter gate#
+	filtered<-split(filteredRec,flowCore::filter(filteredRec,c2f)) # actually filter the samples based on the curve2Filter#
+	filteredPlus<-filtered$`area 1`} # extract the cells that wall within the central area of the gate#
+#
+	filteredPlus # return the final filtered sample#
+#
+# after filtering, samples are re-analyzed for expression distribution characteristics#
+# make a contour plot, which I guess is a publication standard for 2-D representations of flow cytometry data.#
+#
+# put data together#
+DT0<-data.table(FSC=exprs(fcs$'FSC-A'),SSC=exprs(fcs$'SSC-A'),fac='original')#
+DTrect<-data.table(FSC=exprs(filteredRec $'FSC-A'),SSC=exprs(filteredRec $'SSC-A'),fac='rectangle filtered')#
+DTcurve<-data.table(FSC=exprs(filteredPlus $'FSC-A'),SSC=exprs(filteredPlus $'SSC-A'),fac='curve2Filt filtered')#
+filtlevs<-c('original','rectangle filtered','curve2Filt filtered')#
+DT<-rbind(DT0,DTrect,DTcurve)#
+DT[,`filtered data`:=factor(fac,levels=filtlevs)]#
+setnames(DT,c('FSC.FSC-A', 'SSC.SSC-A'),c('FSC','SSC'))#
+DT[,c('log10FSC','log10SSC'):=list(log10(FSC+1000)-3,log10(SSC+1000)-3)]#
+#
+# make a 2d kernel density estimate of the two dimensions#
+library(sparr)#
+X<-log10(as.numeric(as.vector(unlist(DT0[,1])))+1000)-3#
+Y<-log10(as.numeric(as.vector(unlist(DT0[,2])))+1000)-3#
+dtp<-ppp(X,Y,window=owin(range(X),range(Y)))#
+test<-bivariate.density(dtp,h0=0.05)#
+zmat<-as.matrix(test$z)#
+x<-test$q$xcol#
+y<-test$q$yrow#
+DTsm<-data.table(Y=y,zmat)#
+DTm<-melt(DTsm,id='Y')#
+dum<-data.table(variable=paste0('V',seq(1,128)),X=x)#
+DTf<-merge(dum,DTm,by='variable')#
+sample(letters,4)#
+#
+# plot filtered samples#
+p<-ggplot(DT,aes(log10FSC,log10SSC,col=`filtered data`))#
+pIUDX<-p+geom_point(size=0.3,shape=21,stroke=0.1)+geom_contour(data=DTf,aes(x=X,y=Y,z=value),inherit.aes=F,col='black',alpha=0.2)+#
+	theme_NewPub+#
+	xlab('log10 FSC signal')+ylab('log10 SSC signal')#
+#
+if(writeplot==T){#
+	w<-3.9;h<-2.85#
+	ggsave(paste0(figout,'17092x-190110-pIUDX-FilteringSSC,FSC,illustration.pdf'), pIUDX,width=w,height=h)#
+}
+pIUDX
+DT00<-fread(paste0(outputdata,'1707xx-dataset.txt'),sep='\t',header=T)#
+#
+# code to generate this file with clusters is below.#
+load(paste0(layout.dir,'/1707xx-181120-Clustered.rdata'))
+outputdata
+paste0(outputdata,'1707xx-dataset.txt')
+# this code was used to generate figures related to experiment 2 for the manuscript#
+source.code.path.file<-'/Users/anew/Downloads/HarmoniousCombinations-master/CustomFunctions.R'#
+aesthetics.dir<-'/Users/anew/Downloads/HarmoniousCombinations-master/Aesthetics_Harmonious_Combinations.R'#
+head.dir<-"/Users/anew/Downloads/HarmoniousCombinations-master/Experiment2"#
+layout.dir<-'./layout.sample.data'#
+date<-'1707xx' # beginning date clones were measured#
+plates.dir<-paste(head.dir,'/ExperimentalPlates',sep='')#
+figout<-'./figure.output/publication/'#
+outputdata<-'./output.data/'#
+setwd(head.dir)#
+source(source.code.path.file)#
+source(aesthetics.dir)#
+writeplot<-F#
+rm(letters)#
+br<-seq(-0.5,2.7,length=61)
+####################################################
+### load data#
+####################################################
+DT00<-fread(paste0(outputdata,'1707xx-dataset.txt'),sep='\t',header=T)#
+#
+# code to generate this file with clusters is below.#
+load(paste0(layout.dir,'/1707xx-181120-Clustered.rdata'))
+####################################################
+### cust functions#
+####################################################
+#
+denscolconv<-function(DT, vnull =T){#
+	DT[,variable:=gsub('dens__','',variable)]#
+	DT[,c('AU.FL','sugar'):=colsplit(variable,'.g',c('AU.FL','sugar'))]#
+	DT[,sugar:=paste0('g',sugar)]#
+	if(vnull ==T)DT[,variable:=NULL]#
+}#
+#
+####################################################
+### set variables and add labels#
+####################################################
+#
+# pull in columns to keep#
+keepcolDT1<-fread(paste0(layout.dir,'/1707xx-180710-ColumnsToKeep.txt'),sep='\t',header=T)#
+keepcolDT<-keepcolDT1[keepcols==T]#
+#
+phenocols<-c('growth.rate','phenotypic.index','fracon.glu','fracon.gal','yfp.mean.glu','yfp.mean.gal')#
+# phenosh<-c('GR','PI','fONglu','fONgal','ymglu','ymgal')#
+factorDefault<-c('orange1','cornflowerblue','darkgreen','red','chartreuse3')#
+#
+dens.cols<-grepincols(DT00,'dens')#
+phenDT<-CloneNamedSummary(DT00[,c('clone.named','allele.named',phenocols),with=F])#
+densDT<-CloneNamedSummary(DT00[,c('clone.named','allele.named',dens.cols),with=F])#
+genocols<-colnames(CloneNamedSummary(DT00[,c('clone.named','allele.named'),with=F]))
+####################################################
+### basic phenotype X-Y plotting: fracon glu vs fracon gal. #
+####################################################
+DT0<-copy(phenDT)#
+phenocols<-c('growth.rate','phenotypic.index','fracon.glu','fracon.gal','yfp.mean.glu','yfp.mean.gal')#
+phenosh<-c('GR','PI','fONglu','fONgal','ymglu','ymgal')#
+genocols<-colnames(CloneNamedSummary(DT00[,c('clone.named'),with=F]))#
+summ<-summary.func.all(DT0,phenocols,notin(genocols,c('allele.named','aa1','bb1','cc1')))#
+summ[,fac:=single_locus]#
+summ[is.na(single_locus),fac:='double mutant']#
+summ[,`Single mutant locus`:=factor(fac,levels=c('GAL4','GAL3','GAL80','double mutant'))]#
+cols<-c(brewer.pal(5, "Set1")[1:3],'grey70')#
+#
+limits<-c(0,1)#
+sample(LETTERS,4)#
+pOKJG<-ggplot(summ[order(`Single mutant\nlocus`,decreasing=T)],aes(x=fracon.glu_mean,y=fracon.gal_mean,xmax=fracon.glu_upper,xmin=fracon.glu_lower,ymax=fracon.gal_upper,ymin=fracon.gal_upper))+#
+	theme_NewPub(arrow=T)+#
+	geom_abline(col='grey70')+#
+	geom_errorbarh(aes(col=`Single mutant\nlocus`))+geom_errorbar(aes(col=`Single mutant\nlocus`))+geom_point(aes(col=`Single mutant\nlocus`),shape=21,size=2,stroke=1)+#
+	scale_colour_manual(values=alpha(cols,c(1,1,1,0.3)))+#
+	theme(strip.text.x=element_blank(),strip.text.y=element_blank())+#
+	ylim(limits)+xlim(limits)+#
+	xlab('fraction ON in glucose')+ylab('fraction ON in galactose')+#
+	theme(legend.position='bottom')#
+if(writeplot==T){#
+	w<-2.8;h<-2.6#
+	ggsave(paste0(figout,date,'-181119-pOKJG-FraconGluVsFraconGal.pdf'), pOKJG,width=w,height=h)	#
+}
+pOKJG
+DT0<-copy(phenDT)#
+phenocols<-c('growth.rate','phenotypic.index','fracon.glu','fracon.gal','yfp.mean.glu','yfp.mean.gal')#
+phenosh<-c('GR','PI','fONglu','fONgal','ymglu','ymgal')#
+genocols<-colnames(CloneNamedSummary(DT00[,c('clone.named'),with=F]))#
+summ<-summary.func.all(DT0,phenocols,notin(genocols,c('allele.named','aa1','bb1','cc1')))#
+summ[,fac:=single_locus]#
+summ[is.na(single_locus),fac:='double mutant']#
+summ[,`Single mutant\nlocus`:=factor(fac,levels=c('GAL4','GAL3','GAL80','double mutant'))]#
+cols<-c(brewer.pal(5, "Set1")[1:3],'grey70')#
+#
+limits<-c(0,1)#
+sample(LETTERS,4)#
+pOKJG<-ggplot(summ[order(`Single mutant\nlocus`,decreasing=T)],aes(x=fracon.glu_mean,y=fracon.gal_mean,xmax=fracon.glu_upper,xmin=fracon.glu_lower,ymax=fracon.gal_upper,ymin=fracon.gal_upper))+#
+	theme_NewPub(arrow=T)+#
+	geom_abline(col='grey70')+#
+	geom_errorbarh(aes(col=`Single mutant\nlocus`))+geom_errorbar(aes(col=`Single mutant\nlocus`))+geom_point(aes(col=`Single mutant\nlocus`),shape=21,size=2,stroke=1)+#
+	scale_colour_manual(values=alpha(cols,c(1,1,1,0.3)))+#
+	theme(strip.text.x=element_blank(),strip.text.y=element_blank())+#
+	ylim(limits)+xlim(limits)+#
+	xlab('fraction ON in glucose')+ylab('fraction ON in galactose')+#
+	theme(legend.position='bottom')
+DT0<-copy(phenDT)#
+phenocols<-c('growth.rate','phenotypic.index','fracon.glu','fracon.gal','yfp.mean.glu','yfp.mean.gal')#
+phenosh<-c('GR','PI','fONglu','fONgal','ymglu','ymgal')#
+genocols<-colnames(CloneNamedSummary(DT00[,c('clone.named'),with=F]))#
+summ<-summary.func.all(DT0,phenocols,notin(genocols,c('allele.named','aa1','bb1','cc1')))#
+summ[,fac:=single_locus]#
+summ[is.na(single_locus),fac:='double mutant']#
+summ[,`Single mutant\nlocus`:=factor(fac,levels=c('GAL4','GAL3','GAL80','double mutant'))]#
+cols<-c(brewer.pal(5, "Set1")[1:3],'grey70')
+CloneNamedSummary(DT00[,c('clone.named'),with=F])
+genocols<-colnames(CloneNamedSummary(DT00[,c('clone.named'),with=F],allele=F))
+summ<-summary.func.all(DT0,phenocols,notin(genocols,c('allele.named','aa1','bb1','cc1')))#
+summ[,fac:=single_locus]#
+summ[is.na(single_locus),fac:='double mutant']#
+summ[,`Single mutant\nlocus`:=factor(fac,levels=c('GAL4','GAL3','GAL80','double mutant'))]#
+cols<-c(brewer.pal(5, "Set1")[1:3],'grey70')
+limits<-c(0,1)#
+sample(LETTERS,4)#
+pOKJG<-ggplot(summ[order(`Single mutant\nlocus`,decreasing=T)],aes(x=fracon.glu_mean,y=fracon.gal_mean,xmax=fracon.glu_upper,xmin=fracon.glu_lower,ymax=fracon.gal_upper,ymin=fracon.gal_upper))+#
+	theme_NewPub(arrow=T)+#
+	geom_abline(col='grey70')+#
+	geom_errorbarh(aes(col=`Single mutant\nlocus`))+geom_errorbar(aes(col=`Single mutant\nlocus`))+geom_point(aes(col=`Single mutant\nlocus`),shape=21,size=2,stroke=1)+#
+	scale_colour_manual(values=alpha(cols,c(1,1,1,0.3)))+#
+	theme(strip.text.x=element_blank(),strip.text.y=element_blank())+#
+	ylim(limits)+xlim(limits)+#
+	xlab('fraction ON in glucose')+ylab('fraction ON in galactose')+#
+	theme(legend.position='bottom')
+pOKJG<-ggplot(summ[order(`Single mutant\nlocus`,decreasing=T)],aes(x=fracon.glu_mean,y=fracon.gal_mean,xmax=fracon.glu_upper,xmin=fracon.glu_lower,ymax=fracon.gal_upper,ymin=fracon.gal_upper))+#
+	theme_NewPub+#
+	geom_abline(col='grey70')+#
+	geom_errorbarh(aes(col=`Single mutant\nlocus`))+geom_errorbar(aes(col=`Single mutant\nlocus`))+geom_point(aes(col=`Single mutant\nlocus`),shape=21,size=2,stroke=1)+#
+	scale_colour_manual(values=alpha(cols,c(1,1,1,0.3)))+#
+	theme(strip.text.x=element_blank(),strip.text.y=element_blank())+#
+	ylim(limits)+xlim(limits)+#
+	xlab('fraction ON in glucose')+ylab('fraction ON in galactose')+#
+	theme(legend.position='bottom')
+pOKJG
+####################################################
+### all expression distribution phenotypes#
+####################################################
+#
+ylimits<-c(0,0.35)#
+genos<-c('aa','bb','cc','pairing')#
+denscolconv<-function(DT, vnull =T){#
+	DT[,variable:=gsub('dens.','',variable)]#
+	DT[,c('AU.FL','sugar'):=colsplit(variable,'.g',c('AU.FL','sugar'))]#
+	DT[,sugar:=paste0('g',sugar)]#
+	if(vnull ==T)DT[,variable:=NULL]#
+}#
+#
+DTx<-copy(densDT[!is.na(clone.named)])#
+DTX<-merge(DTx,clusterframe0,by='clone.named')#
+#
+DTX[,pairing:=mutant_gene]#
+WTFrame<-DTX[WT==T]#
+a<-copy(WTFrame);b<-copy(WTFrame);cx<-copy(WTFrame);aa<-copy(WTFrame);bb<-copy(WTFrame);cxc<-copy(WTFrame)#
+a[,pairing:='GAL80 GAL4'];b[,pairing:='GAL3 GAL80'];cx[,pairing:='GAL80 GAL4'];aa[,pairing:='GAL3 GAL4'];bb[,pairing:='GAL3 GAL4'];cxc[,pairing:='GAL3 GAL80']#
+DTX1<-rbind(DTX[WT!=T],a,b,cx,aa,bb,cxc)#
+#
+singleframe<-DTX[single_lv==T]#
+a<-copy(singleframe[WT!=T]);b<-copy(singleframe[WT!=T]);cx<-copy(singleframe[WT!=T]);aa<-copy(singleframe[WT!=T]);bb<-copy(singleframe[WT!=T]);cxc<-copy(singleframe[WT!=T])#
+a[,pairing:='GAL80 GAL4'];b[,pairing:='GAL3 GAL80'];cx[,pairing:='GAL80 GAL4'];aa[,pairing:='GAL3 GAL4'];bb[,pairing:='GAL3 GAL4'];cxc[,pairing:='GAL3 GAL80']#
+DTX2<-rbind(DTX1[single_lv!=T],a,b,cx,aa,bb,cxc)#
+#
+singleframe2<-merge(phenDT[single_lv==T],clusterframe0,by='clone.named')#
+singleframe2[grepl('GAL4',mutant_gene),gene:='GAL4']#
+singleframe2[grepl('GAL3',mutant_gene),gene:='GAL3']#
+singleframe2[grepl('GAL80',mutant_gene),gene:='GAL80']#
+summ<-singleframe2[,summary.func(phenotypic.index),by=c('mutants','cluster_Simple','gene')]#
+summ[,var1:=mean(mean),by=cluster_Simple]#
+G3<-c(c('GAL3.WT','GAL3.delta'),notin(gsub('GAL3.WT GAL80.WT GAL4.WT','GAL3.WT',summ[gene=='GAL3'|mutants=='GAL3.WT GAL80.WT GAL4.WT'][order(var1,mean)]$mutants),c('GAL3.WT','GAL3.delta')))#
+G80<-c(c('GAL80.WT','GAL80.delta'),notin(gsub('GAL3.WT GAL80.WT GAL4.WT','GAL80.WT',summ[gene=='GAL80'|mutants=='GAL3.WT GAL80.WT GAL4.WT'][order(var1,mean)]$mutants),c('GAL80.WT','GAL80.delta')))#
+G4<-c(c('GAL4.WT','GAL4.delta'),notin(gsub('GAL3.WT GAL80.WT GAL4.WT','GAL4.WT',summ[gene=='GAL4'|mutants=='GAL3.WT GAL80.WT GAL4.WT'][order(var1,mean)]$mutants),c('GAL4.WT','GAL4.delta')))#
+DTX2[,aa:=factor(aa,levels=G4)]#
+DTX2[,bb:=factor(bb,levels=G3)]#
+DTX2[,cc:=factor(cc,levels=G80)]#
+mDT0<-melt(DTX2[,c(dens.cols,genos,'cluster_Simple'),with=F],id=c(genos,'cluster_Simple'))#;mDT<-mDT[order(sugar,AU.FL,decreasing=T)]#
+mDT<-mDT0[, list(density_mean=mean(value,na.rm=T),density_sd=sd(value,na.rm=T)),by=c(genos,'variable')]#
+denscolconv(mDT)#
+mDT[,AU.FL:=as.numeric(gsub('_','',AU.FL))]#
+mDT[density_mean>=max(ylimits),density_mean:=max(ylimits)]#
+#
+ExpDensLinePlot<-function(mDT1,ylimits=c(0,0.35)){#
+	xlimits<-c(-0.3,3)#
+	xbreaks<-c(0,1,2)#
+	xlabs<-c('0','1','2')#
+	ybreaks<-c(0.0,0.1,0.2,0.3)#
+	ylabs<-c('0.0',paste0(ybreaks[2:3]),paste0('>',max(ybreaks)))#
+	ggplot(mDT1[order(sugar)],aes(AU.FL,density_mean))+#geom_point(data=mDT1,aes(AU.FL,value,col=sugar),size=0.1,alpha=0.3,shape=21)+#
+		theme_NewPub+#
+		geom_ribbon(aes(x=AU.FL,ymax=density_mean+density_sd,ymin=density_mean-density_sd,fill=sugar),alpha=0.3)+#
+		geom_line(aes(col=sugar))+#
+		scale_colour_manual(values= factorTwoSugar,na.value='transparent')+#
+		ylab('density') + xlab('pseudo-log10 fluorescence intensity, A.U.')+#
+		scale_y_continuous(limits=ylimits,breaks=ybreaks,labels=ylabs)+#
+	#	scale_x_continuous(limits=xlimits,breaks=xbreaks,labels=xlabs)+#
+		theme(legend.position='none')#
+}#
+#
+mDT1<-mDT#[aa%in%G4&cc%in%G80&bb%in%G3]#
+sample(LETTERS,4)#
+pXFWV_GAL80vGAL4<-ExpDensLinePlot(mDT1[pairing=='GAL80 GAL4'])+facet_grid(cc~aa)+theme(axis.title=element_text(size=30))#
+pXFWV_GAL3vGAL4<-ExpDensLinePlot(mDT1[pairing=='GAL3 GAL4'])+facet_grid(bb~aa)+theme(axis.title=element_text(size=30))#
+pXFWV_GAL3vGAL80<-ExpDensLinePlot(mDT1[pairing=='GAL3 GAL80'])+facet_grid(bb~cc)+theme(axis.title=element_text(size=30))
+pXFWV_GAL80vGAL4
