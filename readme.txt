@@ -8,6 +8,6 @@ Especially problematic might be executing flowCore-related packages. This packag
 
 Dates of experiments are in YYMMDD format. 
 
-My apologies for the whack code. You might be confused by the random pWZYZ names of the plots. At some point I become overwhelmed with copies of all basically-the-same-but-slightly-different plots, so to keep track of the versions I just make a 4-letter random code for the figure.
+You might be confused by the random pWXYZ names of the plots. At some point I become overwhelmed with copies of all basically-the-same-but-slightly-different plots, so to keep track of the versions I just make a 4-letter random code for the figure.
 
 
